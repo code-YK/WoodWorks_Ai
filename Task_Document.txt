@@ -1,0 +1,69 @@
+Capstone
+Project: "WoodWorks AI" – Enterprise Furniture Assistant
+
+1. Core Architecture (Supervisor Model)
+The system uses a Supervisor Node to
+route tasks between four distinct agents. It acts like a manager and
+decides which agent should handle the next step. 
+
+2. Database Schema (SQL)
+The system uses a relational
+database. SQLite is recommended for development and PostgreSQL for
+production.
+
+Table: users
+Stores customer details required for
+delivery and installation. Details like name, email, contact no,
+delivery address.
+
+Table: product_items
+Master inventory table storing all
+materials. Include details like item id, category or group, name,
+compatible product, price per unit, stock quantity, spec other
+details etc.
+
+Table: orders
+Stores final confirmed projects.
+Include details like order id, user id, product type, final price,
+status etc.
+
+3. Agent Responsibilities
+Agent 1: User Info Collector
+Goal: Register the user before
+requirement discussion.
+
+Collects necessary details about user.
+
+Agent 2: Human Spec
+Goal: Gather human requirements
+based on product type.
+
+Examples:
+
+Wardrobe: Wall size,
+door style, internal layout, mirror.
+
+Kitchen: Layout shape,
+window, pantry unit, fridge width.
+
+TV Unit: TV size, floating or
+floor, soundbar/console space.
+
+Agent 3: Tech Spec
+Goal: Identify
+the necessary engineering rules and installation calculations, then
+define this logic in your technical specification. Calculate the
+final measurements by applying these rules to the gathered user
+requirements.
+Note:
+ask quesitons to user, but validate calculation and then present
+summary to user.
+
+Agent 4: Stock & Pricing Manager
+Goal: According to user details
+about product check that accessory into inventory and then present it
+to user like this is in stock and this is in out stock, and then
+confirm order with user, lastly present order details. 
+
+
+Make pydantic schema for each product specific questions, Include concepts like human in the loop, memory, state management and all required concepts
