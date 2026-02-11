@@ -2,6 +2,7 @@ venv\
 .env
 logs\
 __pycache__\
+*.pyc
 *.log
 woodworks_ai.db
 notes.txt
