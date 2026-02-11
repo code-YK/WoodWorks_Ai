@@ -1,0 +1,31 @@
+# Core Language & Validation
+pydantic>=2.5
+pydantic-settings>=2.0
+email-validator>=2.0
+
+# LLM Layer
+groq>=0.9.0
+langchain>=0.2.0
+langchain-core>=0.2.0
+langchain-groq>=0.1.3
+
+langgraph>=0.0.40
+
+# Database & ORM
+sqlalchemy>=2.0
+sqlite-utils>=3.35
+
+# UI Layer
+streamlit>=1.30
+
+# Logging & Utilities
+python-dotenv>=1.0
+loguru>=0.7.2
+
+# Data & Helpers
+python-dateutil>=2.8
+rich>=13.7
+
+# Notebooks (Debugging)
+jupyterlab>=4.0
+ipykernel>=6.25
