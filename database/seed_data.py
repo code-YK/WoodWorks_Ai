@@ -1,0 +1,288 @@
+import logging
+from database.session import get_session
+from database.models import ProductCatalog, ProductItem
+
+logger = logging.getLogger(__name__)
+
+PRODUCTS = [
+    {
+        "name": "Farmhouse Dining Table",
+        "category": "Dining",
+        "description": "Solid wood farmhouse dining table with hand-distressed finish, supports up to 8 people.",
+        "base_price": 1299.00,
+        "material": "Solid Oak",
+        "finish_options": "Natural, Walnut Stain, Whitewash, Ebony",
+        "dimensions_guide": "L: 60-96in, W: 36-42in, H: 30in",
+        "customizable": 1,
+        "stock": 12,
+    },
+    {
+        "name": "Mid-Century Modern Sofa",
+        "category": "Living Room",
+        "description": "Three-seater sofa with tapered solid wood legs and premium upholstery.",
+        "base_price": 1850.00,
+        "material": "Walnut Frame, Fabric Upholstery",
+        "finish_options": "Charcoal, Cream, Mustard, Forest Green",
+        "dimensions_guide": "L: 84in, D: 34in, H: 33in",
+        "customizable": 1,
+        "stock": 8,
+    },
+    {
+        "name": "Shaker Wardrobe",
+        "category": "Bedroom",
+        "description": "Classic shaker-style wardrobe with dovetail joinery, full-length mirror option.",
+        "base_price": 2200.00,
+        "material": "Solid Maple",
+        "finish_options": "White, Dove Grey, Natural Maple, Midnight Blue",
+        "dimensions_guide": "W: 48-72in, D: 22in, H: 80in",
+        "customizable": 1,
+        "stock": 6,
+    },
+    {
+        "name": "Executive Office Desk",
+        "category": "Office",
+        "description": "L-shaped executive desk with cable management, file drawer and hutch.",
+        "base_price": 1750.00,
+        "material": "Solid Cherry",
+        "finish_options": "Cherry, Dark Walnut, Espresso",
+        "dimensions_guide": "W: 72in, D: 36in, H: 30in",
+        "customizable": 1,
+        "stock": 5,
+    },
+    {
+        "name": "Floating Wall Bookshelf",
+        "category": "Storage",
+        "description": "Modular floating bookshelves with hidden bracket system. Stackable design.",
+        "base_price": 450.00,
+        "material": "Solid Pine",
+        "finish_options": "Raw Pine, White, Black, Teak",
+        "dimensions_guide": "W: 36-60in, D: 10in, H: 10in per shelf",
+        "customizable": 1,
+        "stock": 25,
+    },
+    {
+        "name": "Platform Bed Frame",
+        "category": "Bedroom",
+        "description": "Low-profile platform bed with slatted base, no box spring needed.",
+        "base_price": 980.00,
+        "material": "Solid Walnut",
+        "finish_options": "Natural Walnut, Dark Ebony, Honey Oak",
+        "dimensions_guide": "Twin / Full / Queen / King",
+        "customizable": 1,
+        "stock": 10,
+    },
+    {
+        "name": "Farmhouse Coffee Table",
+        "category": "Living Room",
+        "description": "Reclaimed wood coffee table with lower storage shelf and metal hairpin legs.",
+        "base_price": 620.00,
+        "material": "Reclaimed Elm",
+        "finish_options": "Reclaimed Natural, Stained Grey, Burnt Oak",
+        "dimensions_guide": "L: 48in, W: 24in, H: 18in",
+        "customizable": 1,
+        "stock": 15,
+    },
+    {
+        "name": "Kitchen Island",
+        "category": "Kitchen",
+        "description": "Butcher block top kitchen island with open shelving and drawer storage.",
+        "base_price": 1450.00,
+        "material": "Hard Maple Butcher Block",
+        "finish_options": "Natural, Oiled, Painted White Base",
+        "dimensions_guide": "L: 48-60in, W: 24in, H: 36in",
+        "customizable": 1,
+        "stock": 7,
+    },
+    {
+        "name": "Entryway Bench",
+        "category": "Entryway",
+        "description": "Solid wood entryway bench with storage compartments and coat hooks above.",
+        "base_price": 380.00,
+        "material": "Solid Birch",
+        "finish_options": "Natural Birch, White, Grey Wash",
+        "dimensions_guide": "W: 48in, D: 14in, H: 18in bench / 72in with hooks",
+        "customizable": 1,
+        "stock": 18,
+    },
+    {
+        "name": "Rustic TV Console",
+        "category": "Living Room",
+        "description": "Wide TV console with barn door sliding panels and interior shelving.",
+        "base_price": 890.00,
+        "material": "Reclaimed Pine",
+        "finish_options": "Reclaimed Brown, Weathered Grey, Black",
+        "dimensions_guide": "W: 60-72in, D: 18in, H: 30in",
+        "customizable": 1,
+        "stock": 9,
+    },
+    {
+        "name": "Ladder Bookcase",
+        "category": "Storage",
+        "description": "5-tier leaning ladder bookcase with anti-tip wall anchor.",
+        "base_price": 320.00,
+        "material": "Solid Rubber Wood",
+        "finish_options": "Natural, Espresso, White",
+        "dimensions_guide": "W: 24in, D: 15in, H: 70in",
+        "customizable": 0,
+        "stock": 30,
+    },
+    {
+        "name": "Upholstered Accent Chair",
+        "category": "Living Room",
+        "description": "Barrel-style accent chair with solid wood legs and tight cushion seat.",
+        "base_price": 540.00,
+        "material": "Beech Frame, Velvet Upholstery",
+        "finish_options": "Dusty Pink, Sage Green, Navy, Caramel",
+        "dimensions_guide": "W: 30in, D: 30in, H: 32in",
+        "customizable": 1,
+        "stock": 14,
+    },
+    {
+        "name": "Kids Loft Bed",
+        "category": "Kids",
+        "description": "Full loft bed with built-in desk underneath and storage stairs.",
+        "base_price": 1100.00,
+        "material": "Solid Pine",
+        "finish_options": "White, Natural Pine, Grey",
+        "dimensions_guide": "Twin size, W: 42in, D: 80in, H: 65in",
+        "customizable": 1,
+        "stock": 4,
+    },
+    {
+        "name": "Bathroom Vanity",
+        "category": "Bathroom",
+        "description": "Freestanding wood vanity with undermount sink cutout and two drawers.",
+        "base_price": 780.00,
+        "material": "Solid Teak",
+        "finish_options": "Natural Teak, Whitewash, Dark Stain",
+        "dimensions_guide": "W: 36-48in, D: 21in, H: 32in",
+        "customizable": 1,
+        "stock": 6,
+    },
+    {
+        "name": "Outdoor Adirondack Chair",
+        "category": "Outdoor",
+        "description": "Classic Adirondack chair built for outdoor use with UV-resistant finish.",
+        "base_price": 290.00,
+        "material": "Western Red Cedar",
+        "finish_options": "Natural Cedar, Painted White, Forest Green",
+        "dimensions_guide": "W: 29in, D: 33in, H: 37in",
+        "customizable": 0,
+        "stock": 20,
+    },
+    {
+        "name": "Wine Rack Cabinet",
+        "category": "Dining",
+        "description": "Freestanding wine rack with storage for 30 bottles and stemware shelf.",
+        "base_price": 420.00,
+        "material": "Solid Mahogany",
+        "finish_options": "Mahogany, Ebony, Natural",
+        "dimensions_guide": "W: 24in, D: 14in, H: 48in",
+        "customizable": 0,
+        "stock": 11,
+    },
+    {
+        "name": "Murphy Bed with Shelves",
+        "category": "Bedroom",
+        "description": "Wall-mounted Murphy bed with side shelving units. Queen size.",
+        "base_price": 2800.00,
+        "material": "Plywood with Solid Oak Veneer",
+        "finish_options": "White, Walnut, Grey",
+        "dimensions_guide": "W: 90in, D: 14in closed / 65in open, H: 90in",
+        "customizable": 1,
+        "stock": 3,
+    },
+    {
+        "name": "Corner Desk",
+        "category": "Office",
+        "description": "L-shaped corner desk with monitor shelf and keyboard tray.",
+        "base_price": 680.00,
+        "material": "Solid Bamboo",
+        "finish_options": "Natural Bamboo, Carbonized Dark",
+        "dimensions_guide": "W: 55in each side, D: 24in, H: 30in",
+        "customizable": 1,
+        "stock": 8,
+    },
+    {
+        "name": "Sideboard Buffet",
+        "category": "Dining",
+        "description": "Mid-century sideboard with sliding doors, interior shelves and tapered legs.",
+        "base_price": 1050.00,
+        "material": "Solid Acacia",
+        "finish_options": "Natural Acacia, Dark Walnut, White",
+        "dimensions_guide": "W: 60in, D: 16in, H: 33in",
+        "customizable": 1,
+        "stock": 7,
+    },
+    {
+        "name": "Rocking Chair",
+        "category": "Living Room",
+        "description": "Traditional rocking chair with contoured seat and spindle back. Handcrafted.",
+        "base_price": 480.00,
+        "material": "Solid Hickory",
+        "finish_options": "Natural Hickory, Antique Walnut, Cherry",
+        "dimensions_guide": "W: 26in, D: 38in, H: 45in",
+        "customizable": 0,
+        "stock": 9,
+    },
+    {
+        "name": "Floating Nightstand",
+        "category": "Bedroom",
+        "description": "Wall-mounted nightstand with drawer and USB charging port cutout.",
+        "base_price": 195.00,
+        "material": "Solid Oak",
+        "finish_options": "Natural Oak, White, Black",
+        "dimensions_guide": "W: 18in, D: 12in, H: 6in",
+        "customizable": 1,
+        "stock": 22,
+    },
+    {
+        "name": "Garden Bench",
+        "category": "Outdoor",
+        "description": "Slatted garden bench with mortise-and-tenon joinery. Seats 2-3.",
+        "base_price": 340.00,
+        "material": "Teak",
+        "finish_options": "Natural Teak, Teak Oil Finish",
+        "dimensions_guide": "L: 48in, D: 20in, H: 34in",
+        "customizable": 0,
+        "stock": 13,
+    },
+]
+
+
+def seed_products():
+    with get_session() as session:
+        existing = session.query(ProductCatalog).count()
+        if existing >= len(PRODUCTS):
+            logger.info(f"Seed data already present ({existing} products). Skipping.")
+            return
+
+        for i, p in enumerate(PRODUCTS, start=1):
+            product = ProductCatalog(
+                name=p["name"],
+                category=p["category"],
+                description=p["description"],
+                base_price=p["base_price"],
+                material=p["material"],
+                finish_options=p["finish_options"],
+                dimensions_guide=p["dimensions_guide"],
+                customizable=p["customizable"],
+            )
+            session.add(product)
+            session.flush()
+
+            item = ProductItem(
+                product_id=product.id,
+                sku=f"WW-{str(product.id).zfill(4)}",
+                stock_quantity=p["stock"],
+                reserved_quantity=0,
+            )
+            session.add(item)
+
+        logger.info(f"Seeded {len(PRODUCTS)} products into database.")
+
+
+if __name__ == "__main__":
+    from database.session import init_db
+    init_db()
+    seed_products()
