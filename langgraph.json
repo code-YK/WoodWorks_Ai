@@ -1,0 +1,9 @@
+{
+    "dependencies": [
+        "."
+    ],
+    "graphs": {
+        "woodworks": "./graph/builder.py:graph"
+    },
+    "env": ".env"
+}
