@@ -53,6 +53,12 @@ class WoodWorksState(TypedDict, total=False):
     supervisor_issue: Optional[str]
     supervisor_decision: Optional[Dict[str, Any]]
 
+    # Image analysis (vision feature)
+    image_spec_hint: Optional[Dict[str, Any]]
+
+    # Discount
+    discount_applied: Optional[Dict[str, Any]]
+
 
 def get_initial_state(user_message: str) -> WoodWorksState:
     return WoodWorksState(
@@ -81,4 +87,6 @@ def get_initial_state(user_message: str) -> WoodWorksState:
         receipt_path=None,
         supervisor_issue=None,
         supervisor_decision=None,
+        image_spec_hint=None,
+        discount_applied=None,
     )

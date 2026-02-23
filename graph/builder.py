@@ -10,6 +10,7 @@ from agents.human_spec import human_spec_agent_node
 from agents.technical_spec import technical_spec_agent_node
 from agents.pricing import stock_pricing_agent_node
 from agents.supervisor import supervisor_node
+from agents.discount import discount_agent_node
 
 # Chat Subgraph Nodes
 from agents.chat_subgraph.query_refinement import query_refinement_node
@@ -62,7 +63,7 @@ def _route_from_dispatcher(state: WoodWorksState) -> str:
         logger.info("DISPATCHER | routing → product_selector")
         return "product_selector"
 
-    # BUG 2B FIX: empty dict {} is truthy — require raw_answers to be present
+    
     human_spec = state.get("human_spec")
     if not human_spec or not isinstance(human_spec, dict) or not human_spec.get("raw_answers"):
         logger.info("DISPATCHER | routing → human_spec_agent")
@@ -76,9 +77,22 @@ def _route_from_dispatcher(state: WoodWorksState) -> str:
         logger.info("DISPATCHER | routing → stock_pricing_agent")
         return "stock_pricing_agent"
 
-    # BUG 1 + BUG 2 FIX: confirmed must be checked BEFORE order_id.
-    # final_confirmation always leads to END in a single turn.
-    # Only after the user clicks Confirm (confirmed=True) does a NEW invoke() reach here.
+    # Check for discount request after pricing is available
+    if state.get("pricing_summary") and not state.get("confirmed_by_user"):
+        user_msg = (state.get("user_message") or "").lower()
+        discount_keywords = [
+            "discount", "cheaper", "reduce", "lower", "too high",
+            "too expensive", "negotiate", "deal", "less", "price down",
+            "bring down", "offer", "cut the price", "price cut",
+        ]
+        already_handled = state.get("discount_applied") is not None
+        is_discount_request = any(kw in user_msg for kw in discount_keywords)
+
+        if is_discount_request and not already_handled:
+            logger.info("DISPATCHER | routing → discount_agent")
+            return "discount_agent"
+
+   
     if not confirmed:
         logger.info("DISPATCHER | routing → final_confirmation")
         return "final_confirmation"
@@ -119,6 +133,7 @@ def build_graph() -> StateGraph:
     builder.add_node("human_spec_agent",     human_spec_agent_node)
     builder.add_node("technical_spec_agent", technical_spec_agent_node)
     builder.add_node("stock_pricing_agent",  stock_pricing_agent_node)
+    builder.add_node("discount_agent",       discount_agent_node)
 
     # 4. Fulfillment Nodes
     builder.add_node("final_confirmation", final_confirmation_node)
@@ -140,8 +155,7 @@ def build_graph() -> StateGraph:
     )
 
     # ── Workflow Dispatcher ───────────────────────────────────────────────────
-    # BUG 2 FIX (Part C): All routing targets must be declared in this map.
-    # Missing keys cause LangGraph to silently fall through to END.
+    
     builder.add_conditional_edges(
         "workflow_dispatcher",
         _route_from_dispatcher,
@@ -153,9 +167,10 @@ def build_graph() -> StateGraph:
             "technical_spec_agent": "technical_spec_agent",
             "stock_pricing_agent":  "stock_pricing_agent",
             "final_confirmation":   "final_confirmation",
-            "create_order":         "create_order",       # ← was missing
-            "generate_receipt":     "generate_receipt",   # ← was missing
-            "store_memory":         "store_memory",       # ← was missing
+            "discount_agent":       "discount_agent",
+            "create_order":         "create_order",       
+            "generate_receipt":     "generate_receipt",   
+            "store_memory":         "store_memory",       
         },
     )
 
@@ -170,25 +185,23 @@ def build_graph() -> StateGraph:
     builder.add_edge("store_chat_summary", END)
 
     # ── Workflow Worker Spokes → END ──────────────────────────────────────────
-    # Each worker responds to the user and ends the turn.
-    # The next user message re-enters via intent_decider → dispatcher.
+   
     for node in [
         "user_info_collector",
         "product_selector",
         "human_spec_agent",
-        "technical_spec_agent",
-        "stock_pricing_agent",
     ]:
         builder.add_edge(node, END)
 
-    # ── BUG 1 FIX: final_confirmation → END (never continues to create_order) ─
-    # The old edge was: final_confirmation → order_fulfillment (same turn = bug).
-    # Now: final_confirmation ends the turn. Only a NEW invoke() with
-    # confirmed_by_user=True will route past this node to create_order.
-    builder.add_edge("final_confirmation", END)
+   
+    builder.add_edge("technical_spec_agent", "stock_pricing_agent")
+    builder.add_edge("stock_pricing_agent",  "final_confirmation")
 
-    # ── BUG 2 FIX (Part D): Post-confirmation linear fulfillment chain ────────
-    # Once create_order starts, the full chain runs in a single graph turn.
+    
+    builder.add_edge("final_confirmation", END)
+    
+    builder.add_edge("discount_agent", END)
+    
     builder.add_edge("create_order",     "generate_receipt")
     builder.add_edge("generate_receipt", "store_memory")
     builder.add_edge("store_memory",     END)

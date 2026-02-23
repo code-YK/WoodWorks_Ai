@@ -30,8 +30,6 @@ def create_order_node(state: WoodWorksState) -> WoodWorksState:
     human_spec_str = json.dumps(human_spec, indent=2)
     tech_spec_str = json.dumps(technical_spec, indent=2)
 
-    # BUG 3 FIX (Part D): database-level duplicate guard — block if an identical order
-    # was already created for the same user+product within the last 60 seconds.
     try:
         from database.models import Order
         from database.session import get_session

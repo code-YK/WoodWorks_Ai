@@ -13,9 +13,6 @@ def reasoning_node(state: WoodWorksState) -> WoodWorksState:
     context = state.get("retrieved_context", "")
     history = state.get("conversation_history") or []
 
-    # BUG 2 FIX: Prefer user_message (always set fresh by app.py on every turn) as the
-    # primary source of the current user input. refined_query may be stale from a previous
-    # turn — only use it as a supplement when user_message isn't available.
     user_content = (
         state.get("user_message")
         or state.get("refined_query")
@@ -33,8 +30,27 @@ def reasoning_node(state: WoodWorksState) -> WoodWorksState:
     system_prompt = load_prompt(
         "chat.txt",
         product_catalog_summary=context,
-        conversation_history=""  # history is context only; actual query is user_content
+        conversation_history=""
     )
+
+    # ── Image context injection (vision feature) ────────────────────────
+    image_hint = state.get("image_spec_hint")
+    if image_hint:
+        image_context = (
+            f"\n\nThe customer has uploaded and analyzed a furniture image. "
+            f"Detected: {image_hint.get('furniture_type', 'furniture')} "
+            f"in {image_hint.get('style', 'modern')} style. "
+            f"Material: {image_hint.get('primary_material', 'wood')}. "
+            f"Finish: {image_hint.get('color_finish', 'natural')}. "
+            f"Key features: {image_hint.get('key_features', 'standard')}. "
+            f"Closest catalog match: {image_hint.get('similar_products', 'office furniture')}. "
+            f"Use this as context — the customer is likely interested in "
+            f"something similar to what they uploaded. "
+            f"Reference the image details naturally in your response "
+            f"rather than asking them to describe it again."
+        )
+        system_prompt += image_context
+        logger.info("NODE | Reasoning | image_spec_hint injected into context")
 
     try:
         response_text = call_llm(user_content, system=system_prompt, temperature=0.6)
@@ -44,7 +60,7 @@ def reasoning_node(state: WoodWorksState) -> WoodWorksState:
         response_text = "I'm having trouble thinking right now. Please try again."
 
     logger.info("NODE | Reasoning | EXIT")
-    # BUG 1 FIX: Always return {**state, ...} to preserve all other state fields
+
     return {
         **state,
         "reasoning_output": response_text,

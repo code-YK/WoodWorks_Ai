@@ -20,3 +20,8 @@ RECEIPTS_DIR = "receipts"
 # Graph
 MAX_SUPERVISOR_STEPS = 10
 COMPANY_NAME = "WoodWorks AI"
+
+# Vision LLM (separate Groq account for image analysis)
+GROQ_VISION_API_KEY = os.getenv("GROQ_VISION_API_KEY", "")
+GROQ_VISION_MODEL = os.getenv("GROQ_VISION_MODEL",
+    "meta-llama/llama-4-scout-17b-16e-instruct")

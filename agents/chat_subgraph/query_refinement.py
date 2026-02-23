@@ -12,8 +12,6 @@ def query_refinement_node(state: WoodWorksState) -> WoodWorksState:
     user_message = state.get("user_message", "")
     history = state.get("conversation_history") or []
 
-    # BUG 2 FIX: Always run the LLM — never skip refinement for empty history.
-    # The first message is when refinement matters most; empty history just means
     # it's the start of a conversation.
     if history:
         history_str = "\n".join([

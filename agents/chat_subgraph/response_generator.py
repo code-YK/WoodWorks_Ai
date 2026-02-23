@@ -10,7 +10,7 @@ def response_generator_node(state: WoodWorksState) -> WoodWorksState:
 
     raw_response = state.get("reasoning_output", "")
 
-    # BUG 3 FIX: Guard against empty reasoning_output (e.g. reasoning node crashed).
+    
     # Without this, the user sees a blank response with no explanation.
     if not raw_response or raw_response.strip() == "":
         logger.warning("NODE | ResponseGenerator | reasoning_output is empty — using fallback")
@@ -26,6 +26,17 @@ def response_generator_node(state: WoodWorksState) -> WoodWorksState:
 
     # Formatting / post-processing can be added here in the future
     final_response = raw_response
+
+    # ── Image context enrichment (vision feature) ───────────────────────
+    image_hint = state.get("image_spec_hint")
+    if image_hint and final_response:
+        final_response += (
+            f"\n\n*Based on your uploaded image of a "
+            f"{image_hint.get('furniture_type', 'furniture piece')}, "
+            f"I can help you start a custom order — just say "
+            f"\"I'd like to place an order\" whenever you're ready!*"
+        )
+        logger.info("NODE | ResponseGenerator | appended image-based order nudge")
 
     logger.info("NODE | ResponseGenerator | EXIT")
     return {

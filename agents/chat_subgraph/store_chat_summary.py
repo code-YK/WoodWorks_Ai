@@ -10,14 +10,12 @@ def store_chat_summary_node(state: WoodWorksState) -> WoodWorksState:
 
     assistant_response = state.get("assistant_response", "")
 
-    # BUG 4 FIX: Skip DB write entirely when there is no meaningful content to store.
+  
     # Previously this ran even after reasoning crashed, writing empty records.
     if not assistant_response or assistant_response.strip() == "":
         logger.warning("NODE | StoreChatSummary | Skipping — no response to store")
         return state
 
-    # Append the assistant's response to conversation history explicitly
-    # (operator.add reducer removed from state.py — must build full list here)
     new_history_item = {"role": "assistant", "content": assistant_response}
     _existing_history = state.get("conversation_history") or []
 

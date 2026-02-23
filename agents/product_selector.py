@@ -32,11 +32,28 @@ def product_selector_node(state: WoodWorksState) -> WoodWorksState:
 
     products_list = _format_products_list(products)
 
+    # ── Image hint (vision feature) ──────────────────────────────────────
+    image_hint = state.get("image_spec_hint")
+    image_hint_str = ""
+    if image_hint:
+        image_hint_str = (
+            f"IMPORTANT: Customer uploaded a reference image. "
+            f"Detected furniture type: {image_hint.get('furniture_type')}. "
+            f"Style: {image_hint.get('style_hint')}. "
+            f"Material: {image_hint.get('material_hint')}. "
+            f"Auto-select the closest matching product from the catalog "
+            f"without asking the customer to confirm — set selected=true "
+            f"and include a message telling them what was matched."
+        )
+        logger.info(f"NODE | ProductSelector | image_spec_hint present: "
+                    f"{image_hint.get('furniture_type')}")
+
     prompt = load_prompt(
         "product_selector.txt",
         products_list=products_list,
         user_name=user_name,
         user_message=user_message,
+        image_hint=image_hint_str,
     )
 
     try:

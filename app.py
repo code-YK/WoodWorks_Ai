@@ -10,10 +10,6 @@ from config.logging_config import setup_logging
 logger = setup_logging()
 logger.info("APP | WoodWorks AI starting up")
 
-# ── DB init (Removed) ────────────────────────────────────────────────────────
-# DB initialization is now handled by database/setup_db.py
-
-
 # ── Graph + State ─────────────────────────────────────────────────────────────
 from graph.builder import get_graph
 from graph.state import WoodWorksState, get_initial_state
@@ -84,9 +80,12 @@ def _init_session():
         st.session_state.order_complete = False
     if "receipt_path" not in st.session_state:
         st.session_state.receipt_path = None
-    # BUG 3 FIX (Part B): guard against double-fire on confirm button
     if "confirmation_processing" not in st.session_state:
         st.session_state.confirmation_processing = False
+    if "image_analysis_result" not in st.session_state:
+        st.session_state.image_analysis_result = None
+    if "image_processed" not in st.session_state:
+        st.session_state.image_processed = False
 
 
 _init_session()
@@ -168,9 +167,6 @@ def run_graph(user_message: str) -> str:
     graph = get_graph()
     current_state = dict(st.session_state.graph_state)
 
-    # BUG 1 FIX (Part B): manage history as a single source of truth in app.py.
-    # Build the updated list here and pass it in — do NOT rely on the operator.add
-    # reducer (removed from state.py). This is the only place user messages are appended.
     history = list(current_state.get("conversation_history") or [])
     history.append({"role": "user", "content": user_message})
     current_state["conversation_history"] = history
@@ -187,7 +183,6 @@ def run_graph(user_message: str) -> str:
         st.session_state.graph_state = dict(result)
         response = result.get("assistant_response", "").strip()
 
-        # BUG 2C FIX: fallback when silent nodes (technical_spec, stock_pricing) produce no response
         if not response:
             current = result.get("current_node", "")
             if current == "technical_spec_agent":
@@ -223,22 +218,15 @@ def handle_confirmation():
 
     st.session_state.confirmation_processing = True
 
-    # BUG 3 FIX: Clear confirmation button IMMEDIATELY so it vanishes on first click
-    # regardless of how long graph.invoke() takes to return.
     st.session_state.waiting_for_confirmation = False
 
-    # Step 1: Persist confirmed flags to session_state FIRST (before building state dict).
-    # This prevents a race condition where a Streamlit rerun between click and invoke
-    # reads the old False value from st.session_state.graph_state.
     st.session_state.graph_state["confirmed_by_user"] = True
     st.session_state.graph_state["confirmation_status"] = True
     st.session_state.graph_state["supervisor_issue"] = None
     st.session_state.graph_state["user_message"] = "CONFIRMED"
 
-    # Step 2: Build invoke state FROM the already-updated persisted state
     state = dict(st.session_state.graph_state)
 
-    # Step 3: Log state before invoke so dispatcher decisions are auditable
     logger.info(
         f"APP | handle_confirmation | invoking graph with "
         f"confirmed_by_user={state.get('confirmed_by_user')} "
@@ -252,7 +240,6 @@ def handle_confirmation():
         st.session_state.graph_state = dict(result)
 
         response = result.get("assistant_response", "").strip()
-        # BUG 3 FIX: Always show visible feedback — never leave the user with a blank
         if not response:
             response = "Processing your order... please wait a moment."
 
@@ -264,7 +251,6 @@ def handle_confirmation():
     except Exception as e:
         logger.error(f"APP | handle_confirmation | ERROR: {e}")
         st.error(f"Error confirming order: {e}")
-        # Re-enable the confirm button so user can retry
         st.session_state.waiting_for_confirmation = True
     finally:
         st.session_state.confirmation_processing = False
@@ -295,7 +281,6 @@ def main():
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # BUG 3 FIX (Part C): only render confirm button when genuinely needed, not when already confirmed
     if (st.session_state.waiting_for_confirmation
             and not st.session_state.get("confirmation_processing")
             and not st.session_state.graph_state.get("confirmed_by_user")):
@@ -329,6 +314,77 @@ def main():
                 use_container_width=True,
                 type="primary",
             )
+
+    # ── Image Upload (Optional) ────────────────────────────────────────────
+    if not st.session_state.order_complete:
+        with st.expander("📷 Upload a furniture image (optional)", expanded=False):
+            uploaded_file = st.file_uploader(
+                "Upload a photo of furniture you like or want to reference for your order",
+                type=["jpg", "jpeg", "png", "webp"],
+                key="furniture_image_upload",
+            )
+
+            if uploaded_file is not None:
+                st.image(uploaded_file, caption="Uploaded image", width=200)
+
+                # Auto-analyze on upload — no button click needed
+                file_key = f"analyzed_{uploaded_file.name}_{uploaded_file.size}"
+                if not st.session_state.get(file_key):
+                    with st.spinner("Analyzing image..."):
+                        image_bytes = uploaded_file.read()
+                        media_type = uploaded_file.type  # already a MIME string
+
+                        current_mode = st.session_state.graph_state.get(
+                            "mode", "")
+
+                        if current_mode == "workflow":
+                            from tools.image_search import process_image_for_workflow
+                            result = process_image_for_workflow(
+                                image_bytes, media_type)
+
+                            if result["success"]:
+                                st.session_state.image_analysis_result = result
+                                st.session_state.graph_state[
+                                    "image_spec_hint"] = result["human_spec_hint"]
+                                st.session_state[file_key] = True
+                                msg = result["workflow_message"]
+                                st.session_state.chat_messages.append(
+                                    {"role": "assistant", "content": msg})
+                                st.success("Image analyzed — specs pre-filled!")
+                            else:
+                                st.error(f"Could not analyze image: "
+                                         f"{result.get('error')}")
+                        else:
+                            from tools.image_search import process_image_for_chat
+                            result = process_image_for_chat(
+                                image_bytes, media_type)
+
+                            if result["success"]:
+                                st.session_state.image_analysis_result = result
+                                analysis_message = result["chat_response"]
+
+                                # Append to UI messages
+                                st.session_state.chat_messages.append(
+                                    {"role": "assistant", "content": analysis_message})
+
+                                # Sync to LangGraph conversation_history so chat agent sees it
+                                history = list(
+                                    st.session_state.graph_state.get(
+                                        "conversation_history") or [])
+                                history.append(
+                                    {"role": "assistant", "content": analysis_message})
+                                st.session_state.graph_state[
+                                    "conversation_history"] = history
+
+                                # Store structured hint for reasoning/response nodes
+                                st.session_state.graph_state[
+                                    "image_spec_hint"] = result["analysis"]
+
+                                st.session_state[file_key] = True
+                                st.rerun()
+                            else:
+                                st.error(f"Could not analyze image: "
+                                         f"{result.get('error')}")
 
     # Chat input
     if not st.session_state.order_complete:
